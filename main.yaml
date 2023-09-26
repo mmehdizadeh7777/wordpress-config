@@ -1,0 +1,81 @@
+- name: "install dependencies"
+  hosts: WordPress-server
+  become: yes
+  tasks:
+          - name: "install mysql"
+            apt:
+                    name: mysql-server
+                    update_cache: yes
+          - name: "Install Dependencies"
+            apt:
+                    name: "{{ item }}"
+            loop:
+                            - apache2
+                            - ghostscript
+                            - libapache2-mod-php
+                            - php
+                            - php-bcmath
+                            - php-curl
+                            - php-imagick
+                            - php-intl
+                            - php-json
+                            - php-mbstring
+                            - php-mysql
+                            - php-xml
+                            - php-zip
+                            - python3-pymysql
+- name: "install wordpress"
+  hosts: WordPress-server
+  become: yes
+  tasks:
+  - name: "manage the installation directory"
+    file:
+                path: /srv/www
+                state: directory
+                recurse: yes
+                owner: www-data
+                group: www-data
+  - name: "Download and extract the wordpress installation file"
+    unarchive:
+                src: https://wordpress.org/latest.tar.gz
+                dest: /srv/www
+                remote_src: yes
+- name: "configure Apache for wordpress"
+  hosts: WordPress-server
+  become: yes
+  tasks:
+          - name: "define apache configuration file"
+            copy:
+                    src: ~/wordpress-config/wordpress-apache-config 
+                    dest: /etc/apache2/sites-available/wordpress.conf
+          - name: "Enable apache modules"
+            shell: "{{ item }}"
+            loop:
+                    - a2ensite wordpress
+                    - a2enmod rewrite
+                    - a2dissite 000-default
+                    - service apache2 reload
+- name: "create Database and user"
+  hosts: WordPress-server
+  become: yes
+  tasks:
+          - name: "create Database"
+            mysql_db:
+                  name: wordpress
+                  state: present
+                  login_unix_socket: /var/run/mysqld/mysqld.sock
+          - name: "create database user and manage permissions"
+            mysql_user: 
+                  name: admin
+                  password: "password"
+                  priv: '*.*:ALL'
+                  state: present
+                  login_unix_socket: /var/run/mysqld/mysqld.sock
+- name: "configuring WordPress using config file"
+  hosts: WordPress-server
+  become: yes
+  tasks:
+          - name: "copy config file"
+            copy:
+                    src: ~/wordpress-config/wp-config.php
+                    dest: /srv/www/wordpress/wp-config.php                 
